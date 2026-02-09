@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>邓肯-张参数收集系统 - 文献批量导入</title>
+    <style>
+        /* 基础样式 */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, "Microsoft YaHei", sans-serif;
+            background: #f5f5f5;
+        }
+        
+        /* 地图容器 */
+        #map-container { 
+            position: absolute;
+            left: 320px;
+            top: 0;
+            width: calc(100vw - 320px);
+            height: 100vh;
+        }
+        
+        /* 左侧控制面板 */
+        #control-panel {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 300px;
+            height: 100vh;
+            background: white;
+            padding: 15px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 100;
+        }
+        
+        .param-btn {
+            display: block;
+            margin: 10px 0;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        #cohesion-btn { background: #ff6b6b; color: white; }
+        #friction-btn { background: #4ecdc4; color: white; }
+        #modulus-btn { background: #45b7d1; color: white; }
+        #heatmap-btn { background: #96ceb4; color: white; }
+        #clear-btn { background: #999; color: white; }
+        
+        /* 数据表单 */
+        #data-form {
+            background: white;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .form-group { margin: 15px 0; }
+        label { display: block; margin: 5px 0; font-weight: bold; }
+        input { width: 100%; padding: 10px; box-sizing: border-box; }
+        
+        /* 批量导入区域 */
+        #batch-import {
+            background: #fff;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 2px dashed #ddd;
+        }
+        
+        .drop-zone {
+            border: 2px dashed #4CAF50;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            background: #f9fff9;
+            cursor: pointer;
+            margin: 20px 0;
+        }
+        
+        .drop-zone:hover {
+            background: #e8f5e9;
+        }
+        
+        .template-download {
+            background: #2196F3;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #eee;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .data-summary {
+            background: #f0f8ff;
+            border-left: 4px solid #2196F3;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        
+        /* 表格样式 */
+        #data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        
+        #data-table th, #data-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+        }
+        
+        #data-table th {
+            background: #f5f5f5;
+        }
+        
+        /* 右侧数据面板 */
+        #data-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 100;
+            max-width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 地图容器 -->
+    <div id="map-container"></div>
+    
+    <!-- 左侧控制面板 -->
+    <div id="control-panel">
+        <h2 style="color: #333; margin-top: 0;">邓肯-张参数系统</h2>
+        
+        <h3>数据收集方式</h3>
+        <div style="margin-bottom: 20px;">
+            <button class="param-btn" id="manual-btn" style="background: #FF9800;">手动输入</button>
+            <button class="param-btn" id="batch-btn" style="background: #2196F3;">批量导入</button>
+        </div>
+        
+        <!-- 手动输入表单 -->
+        <div id="data-form">
+            <h3>手动输入参数</h3>
+            <div class="form-group">
+                <label>位置名称：</label>
+                <input type="text" id="location-name" placeholder="如：北京工地A区">
+            </div>
+            <div class="form-group">
+                <label>经度：</label>
+                <input type="number" id="lng-input" step="0.000001" placeholder="如：116.397428">
+            </div>
+            <div class="form-group">
+                <label>纬度：</label>
+                <input type="number" id="lat-input" step="0.000001" placeholder="如：39.90923">
+            </div>
+            <div class="form-group">
+                <label>黏聚力 c (kPa)：</label>
+                <input type="number" id="cohesion-input" step="0.1" placeholder="如：45.6">
+            </div>
+            <div class="form-group">
+                <label>内摩擦角 φ (°)：</label>
+                <input type="number" id="friction-input" step="0.1" placeholder="如：30.5">
+            </div>
+            <div class="form-group">
+                <label>弹性模量 E (MPa)：</label>
+                <input type="number" id="modulus-input" step="1" placeholder="如：1200">
+            </div>
+            <div class="form-group">
+                <label>文献来源：</label>
+                <input type="text" id="source-input" placeholder="论文标题或编号">
+            </div>
+            <div style="text-align: center;">
+                <button id="submit-btn" style="background: #4CAF50; color: white; padding: 10px 30px;">提交</button>
+                <button id="cancel-btn" style="background: #f44336; color: white; padding: 10px 30px;">取消</button>
+            </div>
+        </div>
+        
+        <!-- 批量导入区域 -->
+        <div id="batch-import" style="display: none;">
+            <h3>批量导入文献数据</h3>
+            
+            <div class="drop-zone" id="file-drop-zone">
+                <p>📁 <strong>拖拽文件到此处</strong></p>
+                <p>或点击选择文件</p>
+                <input type="file" id="file-input" multiple style="display: none;">
+                <p style="color: #666; font-size: 12px; margin-top: 10px;">
+                    支持：Excel (.xlsx, .xls), CSV, TXT
+                </p>
+            </div>
+            
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            
+            <div id="import-status"></div>
+            
+            <div style="margin: 20px 0;">
+                <h4>下载模板文件：</h4>
+                <a href="#" class="template-download" onclick="downloadTemplate('excel')">Excel模板</a>
+                <a href="#" class="template-download" onclick="downloadTemplate('csv')">CSV模板</a>
+                <a href="#" class="template-download" onclick="downloadTemplate('txt')">TXT模板</a>
+            </div>
+            
+            <div style="background: #fff8e1; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                <h4>📝 文件格式说明：</h4>
+                <p style="font-size: 12px; margin: 5px 0;">
+                    <strong>Excel/CSV格式：</strong><br>
+                    需要包含以下列：<br>
+                    位置名称, 经度, 纬度, 黏聚力(kPa), 内摩擦角(°), 弹性模量(MPa), 文献来源
+                </p>
+                <p style="font-size: 12px; margin: 5px 0;">
+                    <strong>TXT格式：</strong><br>
+                    每行一个数据，用逗号分隔：<br>
+                    位置名称,经度,纬度,黏聚力,内摩擦角,弹性模量,文献来源
+                </p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <h3>数据显示控制</h3>
+            <button class="param-btn" id="cohesion-btn">显示黏聚力 (c)</button>
+            <button class="param-btn" id="friction-btn">显示内摩擦角 (φ)</button>
+            <button class="param-btn" id="modulus-btn">显示弹性模量 (E)</button>
+            <button class="param-btn" id="heatmap-btn">显示云图</button>
+            <button class="param-btn" id="show-all-btn">显示全部数据</button>
+            <button class="param-btn" id="clear-btn">清除显示</button>
+        </div>
+        
+        <!-- 数据统计 -->
+        <div class="data-summary">
+            <h4>📊 数据统计</h4>
+            <p id="data-count">数据点总数：0</p>
+            <p id="parameter-stats">参数统计：加载中...</p>
+        </div>
+        
+        <!-- 数据表格 -->
+        <div style="margin-top: 20px;">
+            <h4>📋 最近数据</h4>
+            <div style="max-height: 200px; overflow-y: auto;">
+                <table id="data-table">
+                    <thead>
+                        <tr>
+                            <th>位置</th>
+                            <th>c</th>
+                            <th>φ</th>
+                            <th>E</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body">
+                        <!-- 数据行将通过JS动态添加 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 导出按钮 -->
+        <div style="margin-top: 20px;">
+            <button class="param-btn" id="export-btn" style="background: #9C27B0;">导出数据 (CSV)</button>
+            <button class="param-btn" id="export-excel-btn" style="background: #673AB7; margin-top: 5px;">导出数据 (Excel)</button>
+        </div>
+    </div>
+    
+    <!-- 右侧数据详情面板 -->
+    <div id="data-panel">
+        <h3 id="detail-title">数据详情</h3>
+        <div id="detail-content"></div>
+    </div>
+
+    <!-- 引入高德地图JS -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=521cbc548a03bef89df50e3be3b666c1"></script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=521cbc548a03bef89df50e3be3b666c1&plugin=AMap.Heatmap"></script>
+    
+    <!-- 引入XLSX库用于处理Excel文件 -->
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <script>
+        // ===== 全局变量 =====
+        const API_KEY = '521cbc548a03bef89df50e3be3b666c1';
+        let map = null;
+        let currentPosition = {};
+        let allMarkers = [];
+        let heatmap = null;
+        let collectedData = [];
+        
+        // ===== 初始化函数 =====
+        function initMap() {
+            map = new AMap.Map('map-container', {
+                zoom: 10,
+                center: [116.397428, 39.90923],
+                viewMode: '2D'
+            });
+            
+            // 点击地图获取坐标
+            map.on('click', function(event) {
+                currentPosition = {
+                    lng: event.lnglat.getLng(),
+                    lat: event.lnglat.getLat()
+                };
+                
+                // 自动填充坐标到表单
+                document.getElementById('lng-input').value = currentPosition.lng.toFixed(6);
+                document.getElementById('lat-input').value = currentPosition.lat.toFixed(6);
+                
+                // 显示手动输入表单
+                showManualForm();
+            });
+        }
+        
+        // ===== 界面切换函数 =====
+        function showManualForm() {
+            document.getElementById('batch-import').style.display = 'none';
+            document.getElementById('data-form').style.display = 'block';
+        }
+        
+        function showBatchImport() {
+            document.getElementById('data-form').style.display = 'none';
+            document.getElementById('batch-import').style.display = 'block';
+        }
+        
+        // ===== 批量导入功能 =====
+        function initBatchImport() {
+            const dropZone = document.getElementById('file-drop-zone');
+            const fileInput = document.getElementById('file-input');
+            
+            // 点击拖拽区域选择文件
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            // 文件选择事件
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖拽事件
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = '#e8f5e9';
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.backgroundColor = '';
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = '';
+                
+                if (e.dataTransfer.files.length) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+        }
+        
+        // ===== 处理文件选择 =====
+        function handleFileSelect(e) {
+            handleFiles(e.target.files);
+        }
+        
+        function handleFiles(files) {
+            const progressBar = document.getElementById('progress-bar');
+            const progressFill = document.getElementById('progress-fill');
+            const statusDiv = document.getElementById('import-status');
+            
+            progressBar.style.display = 'block';
+            progressFill.style.width = '0%';
+            statusDiv.innerHTML = '<p>正在处理文件...</p>';
+            
+            let totalProcessed = 0;
+            let totalSuccess = 0;
+            
+            // 处理每个文件
+            for (let file of files) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const data = e.target.result;
+                        const fileExtension = file.name.split('.').pop().toLowerCase();
+                        const importedData = parseFile(data, fileExtension);
+                        
+                        totalSuccess += importedData.length;
+                        
+                        // 添加到数据集合
+                        importedData.forEach(item => {
+                            collectedData.push(item);
+                        });
+                        
+                        totalProcessed++;
+                        
+                        // 更新进度
+                        const progress = (totalProcessed / files.length) * 100;
+                        progressFill.style.width = progress + '%';
+                        
+                        if (totalProcessed === files.length) {
+                            // 所有文件处理完成
+                            statusDiv.innerHTML = `
+                                <p style="color: #4CAF50;">✅ 导入完成！</p>
+                                <p>成功导入 ${totalSuccess} 条数据</p>
+                                <p>总数据量：${collectedData.length} 条</p>
+                            `;
+                            
+                            // 更新统计数据
+                            updateDataStats();
+                            // 显示所有数据
+                            showAllData();
+                            // 隐藏进度条
+                            setTimeout(() => {
+                                progressBar.style.display = 'none';
+                            }, 2000);
+                        }
+                    } catch (error) {
+                        console.error('文件解析错误:', error);
+                        statusDiv.innerHTML += `<p style="color: red;">❌ ${file.name}: ${error.message}</p>`;
+                    }
+                };
+                
+                reader.onerror = function() {
+                    statusDiv.innerHTML += `<p style="color: red;">❌ ${file.name}: 文件读取失败</p>`;
+                };
+                
+                // 根据文件类型读取
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reader.readAsText(file, 'UTF-8');
+                }
+            }
+        }
+        
+        // ===== 文件解析函数 =====
+        function parseFile(data, fileType) {
+            const result = [];
+            
+            try {
+                if (fileType === 'xlsx' || fileType === 'xls') {
+                    // 解析Excel文件
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                    
+                    jsonData.forEach(row => {
+                        const dataItem = {
+                            locationName: row['位置名称'] || row['location'] || '',
+                            position: {
+                                lng: parseFloat(row['经度'] || row['lng'] || row['longitude'] || 0),
+                                lat: parseFloat(row['纬度'] || row['lat'] || row['latitude'] || 0)
+                            },
+                            cohesion: parseFloat(row['黏聚力(kPa)'] || row['黏聚力'] || row['cohesion'] || row['c'] || 0),
+                            frictionAngle: parseFloat(row['内摩擦角(°)'] || row['内摩擦角'] || row['frictionAngle'] || row['friction'] || row['φ'] || 0),
+                            modulus: parseFloat(row['弹性模量(MPa)'] || row['弹性模量'] || row['modulus'] || row['E'] || 0),
+                            source: row['文献来源'] || row['source'] || row['文献'] || '',
+                            time: new Date().toLocaleString()
+                        };
+                        
+                        // 验证数据
+                        if (dataItem.position.lng !== 0 && dataItem.position.lat !== 0) {
+                            result.push(dataItem);
+                        }
+                    });
+                    
+                } else if (fileType === 'csv' || fileType === 'txt') {
+                    // 解析CSV/TXT文件
+                    const lines = data.split('\n');
+                    const headers = lines[0].split(',').map(h => h.trim());
+                    
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim() === '') continue;
+                        
+                        const values = lines[i].split(',').map(v => v.trim());
+                        const dataItem = {
+                            locationName: values[0] || '',
+                            position: {
+                                lng: parseFloat(values[1] || 0),
+                                lat: parseFloat(values[2] || 0)
+                            },
+                            cohesion: parseFloat(values[3] || 0),
+                            frictionAngle: parseFloat(values[4] || 0),
+                            modulus: parseFloat(values[5] || 0),
+                            source: values[6] || '',
+                            time: new Date().toLocaleString()
+                        };
+                        
+                        if (dataItem.position.lng !== 0 && dataItem.position.lat !== 0) {
+                            result.push(dataItem);
+                        }
+                    }
+                }
+            } catch (error) {
+                throw new Error(`文件解析失败: ${error.message}`);
+            }
+            
+            return result;
+        }
+        
+        // ===== 模板下载函数 =====
+        function downloadTemplate(type) {
+            let content, fileName, mimeType;
+            
+            if (type === 'excel') {
+                // 创建Excel模板数据
+                const templateData = [
+                    ['位置名称', '经度', '纬度', '黏聚力(kPa)', '内摩擦角(°)', '弹性模量(MPa)', '文献来源'],
+                    ['北京工地A区', '116.397428', '39.90923', '45.6', '30.5', '1200', '张三等, 2020'],
+                    ['上海试验点', '121.473701', '31.230416', '32.1', '25.8', '950', '李四, 2019']
+                ];
+                
+                const worksheet = XLSX.utils.aoa_to_sheet(templateData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, '邓肯-张参数');
+                
+                XLSX.writeFile(workbook, '邓肯-张参数模板.xlsx');
+                return;
+                
+            } else if (type === 'csv') {
+                content = '位置名称,经度,纬度,黏聚力(kPa),内摩擦角(°),弹性模量(MPa),文献来源\n';
+                content += '北京工地A区,116.397428,39.90923,45.6,30.5,1200,张三等, 2020\n';
+                content += '上海试验点,121.473701,31.230416,32.1,25.8,950,李四, 2019';
+                fileName = '邓肯-张参数模板.csv';
+                mimeType = 'text/csv';
+                
+            } else if (type === 'txt') {
+                content = '# 邓肯-张参数数据格式说明\n';
+                content += '# 每行格式：位置名称,经度,纬度,黏聚力(kPa),内摩擦角(°),弹性模量(MPa),文献来源\n';
+                content += '# 示例数据：\n';
+                content += '北京工地A区,116.397428,39.90923,45.6,30.5,1200,张三等, 2020\n';
+                content += '上海试验点,121.473701,31.230416,32.1,25.8,950,李四, 2019';
+                fileName = '邓肯-张参数模板.txt';
+                mimeType = 'text/plain';
+            }
+            
+            const blob = new Blob([content], { type: mimeType });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+        }
+        
+        // ===== 手动数据提交 =====
+        function submitManualData() {
+            const dataPoint = {
+                locationName: document.getElementById('location-name').value || '未命名位置',
+                position: {
+                    lng: parseFloat(document.getElementById('lng-input').value) || currentPosition.lng,
+                    lat: parseFloat(document.getElementById('lat-input').value) || currentPosition.lat
+                },
+                cohesion: parseFloat(document.getElementById('cohesion-input').value) || 0,
+                frictionAngle: parseFloat(document.getElementById('friction-input').value) || 0,
+                modulus: parseFloat(document.getElementById('modulus-input').value) || 0,
+                source: document.getElementById('source-input').value || '手动输入',
+                time: new Date().toLocaleString()
+            };
+            
+            collectedData.push(dataPoint);
+            
+            // 添加标记
+            addMarker(dataPoint);
+            
+            // 清空表单
+            document.getElementById('location-name').value = '';
+            document.getElementById('lng-input').value = '';
+            document.getElementById('lat-input').value = '';
+            document.getElementById('cohesion-input').value = '';
+            document.getElementById('friction-input').value = '';
+            document.getElementById('modulus-input').value = '';
+            document.getElementById('source-input').value = '';
+            
+            // 更新统计
+            updateDataStats();
+            
+            alert('数据保存成功！');
+        }
+        
+        // ===== 标记和显示函数 =====
+        function addMarker(data, isSimplified = false) {
+            let content;
+            
+            if (isSimplified) {
+                // 简化标记（用于批量导入）
+                content = `
+                    <div style="background: #4CAF50; color: white; padding: 5px; 
+                                border-radius: 50%; width: 30px; height: 30px; 
+                                text-align: center; line-height: 20px; font-weight: bold; cursor: pointer;">
+                        📍
+                    </div>
+                `;
+            } else {
+                // 详细标记
+                content = `
+                    <div style="background: white; padding: 10px; border-radius: 5px; 
+                                border: 2px solid #4CAF50; max-width: 200px; cursor: pointer;">
+                        <div style="font-weight: bold; color: #333;">${data.locationName}</div>
+                        <div>黏聚力: <strong>${data.cohesion} kPa</strong></div>
+                        <div>内摩擦角: <strong>${data.frictionAngle}°</strong></div>
+                        <div>弹性模量: <strong>${data.modulus} MPa</strong></div>
+                        <div style="font-size: 11px; color: #666; margin-top: 5px;">${data.source}</div>
+                    </div>
+                `;
+            }
+            
+            const marker = new AMap.Marker({
+                position: [data.position.lng, data.position.lat],
+                content: content,
+                offset: isSimplified ? new AMap.Pixel(-15, -15) : new AMap.Pixel(-100, -80)
+            });
+            
+            // 添加点击事件
+            marker.on('click', () => {
+                showDataDetail(data);
+            });
+            
+            marker.setMap(map);
+            allMarkers.push(marker);
+            
+            // 更新数据表格
+            updateDataTable(data);
+        }
+        
+        // ===== 数据详情面板 =====
+        function showDataDetail(data) {
+            const panel = document.getElementById('data-panel');
+            const title = document.getElementById('detail-title');
+            const content = document.getElementById('detail-content');
+            
+            title.textContent = data.locationName || '数据详情';
+            content.innerHTML = `
+                <p><strong>📍 位置坐标：</strong></p>
+                <p>经度：${data.position.lng.toFixed(6)}</p>
+                <p>纬度：${data.position.lat.toFixed(6)}</p>
+                <hr>
+                <p><strong>📊 邓肯-张参数：</strong></p>
+                <p>黏聚力 c：<strong style="color: #ff6b6b;">${data.cohesion} kPa</strong></p>
+                <p>内摩擦角 φ：<strong style="color: #4ecdc4;">${data.frictionAngle}°</strong></p>
+                <p>弹性模量 E：<strong style="color: #45b7d1;">${data.modulus} MPa</strong></p>
+                <hr>
+                <p><strong>📚 文献来源：</strong></p>
+                <p>${data.source || '未指定'}</p>
+                <p><strong>⏰ 录入时间：</strong></p>
+                <p>${data.time}</p>
+            `;
+            
+            panel.style.display = 'block';
+        }
+        
+        // ===== 更新数据表格 =====
+        function updateDataTable(data) {
+            const tableBody = document.getElementById('data-table-body');
+            const newRow = document.createElement('tr');
+            
+            newRow.innerHTML = `
+                <td>${data.locationName.substring(0, 10)}${data.locationName.length > 10 ? '...' : ''}</td>
+                <td>${data.cohesion}</td>
+                <td>${data.frictionAngle}</td>
+                <td>${data.modulus}</td>
+            `;
+            
+            // 插入到表格开头
+            tableBody.insertBefore(newRow, tableBody.firstChild);
+            
+            // 限制显示行数
+            if (tableBody.children.length > 10) {
+                tableBody.removeChild(tableBody.lastChild);
+            }
+        }
+        
+        // ===== 更新数据统计 =====
+        function updateDataStats() {
+            const countElement = document.getElementById('data-count');
+            const statsElement = document.getElementById('parameter-stats');
+            
+            countElement.textContent = `数据点总数：${collectedData.length}`;
+            
+            if (collectedData.length > 0) {
+                const cohesionValues = collectedData.map(d => d.cohesion).filter(v => v > 0);
+                const frictionValues = collectedData.map(d => d.frictionAngle).filter(v => v > 0);
+                const modulusValues = collectedData.map(d => d.modulus).filter(v => v > 0);
+                
+                const stats = [
+                    `黏聚力范围：${cohesionValues.length > 0 ? Math.min(...cohesionValues).toFixed(1) : '-'} - ${cohesionValues.length > 0 ? Math.max(...cohesionValues).toFixed(1) : '-'} kPa`,
+                    `内摩擦角范围：${frictionValues.length > 0 ? Math.min(...frictionValues).toFixed(1) : '-'} - ${frictionValues.length > 0 ? Math.max(...frictionValues).toFixed(1) : '-'} °`,
+                    `弹性模量范围：${modulusValues.length > 0 ? Math.min(...modulusValues).toFixed(0) : '-'} - ${modulusValues.length > 0 ? Math.max(...modulusValues).toFixed(0) : '-'} MPa`
+                ];
+                
+                statsElement.innerHTML = stats.join('<br>');
+            }
+        }
+        
+        // ===== 数据导出函数 =====
+        function exportDataCSV() {
+            if (collectedData.length === 0) {
+                alert('没有数据可导出！');
+                return;
+            }
+            
+            let csv = '位置名称,经度,纬度,黏聚力(kPa),内摩擦角(°),弹性模量(MPa),文献来源,录入时间\n';
+            
+            collectedData.forEach(data => {
+                csv += `"${data.locationName}",${data.position.lng},${data.position.lat},${data.cohesion},${data.frictionAngle},${data.modulus},"${data.source}","${data.time}"\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `邓肯-张参数数据_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+        
+        function exportDataExcel() {
+            if (collectedData.length === 0) {
+                alert('没有数据可导出！');
+                return;
+            }
+            
+            const worksheetData = [
+                ['位置名称', '经度', '纬度', '黏聚力(kPa)', '内摩擦角(°)', '弹性模量(MPa)', '文献来源', '录入时间']
+            ];
+            
+            collectedData.forEach(data => {
+                worksheetData.push([
+                    data.locationName,
+                    data.position.lng,
+                    data.position.lat,
+                    data.cohesion,
+                    data.frictionAngle,
+                    data.modulus,
+                    data.source,
+                    data.time
+                ]);
+            });
+            
+            const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '邓肯-张参数数据');
+            
+            XLSX.writeFile(workbook, `邓肯-张参数数据_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+        
+        // ===== 页面初始化 =====
+        window.onload = function() {
+            // 初始化地图
+            initMap();
+            
+            // 初始化批量导入
+            initBatchImport();
+            
+            // 绑定按钮事件
+            document.getElementById('manual-btn').onclick = showManualForm;
+            document.getElementById('batch-btn').onclick = showBatchImport;
+            
+            document.getElementById('submit-btn').onclick = submitManualData;
+            document.getElementById('cancel-btn').onclick = () => {
+                document.getElementById('data-form').style.display = 'none';
+            };
+            
+            // 显示控制按钮
+            document.getElementById('cohesion-btn').onclick = () => showParameter('cohesion');
+            document.getElementById('friction-btn').onclick = () => showParameter('frictionAngle');
+            document.getElementById('modulus-btn').onclick = () => showParameter('modulus');
+            document.getElementById('heatmap-btn').onclick = () => showHeatmap('cohesion');
+            document.getElementById('show-all-btn').onclick = showAllData;
+            document.getElementById('clear-btn').onclick = clearDisplay;
+            
+            // 导出按钮
+            document.getElementById('export-btn').onclick = exportDataCSV;
+            document.getElementById('export-excel-btn').onclick = exportDataExcel;
+            
+            // 添加示例数据
+            setTimeout(() => {
+                const exampleData = [
+                    {
+                        locationName: '北京测试点',
+                        position: { lng: 116.397428, lat: 39.90923 },
+                        cohesion: 45.6,
+                        frictionAngle: 30.5,
+                        modulus: 1200,
+                        source: '示例数据1',
+                        time: new Date().toLocaleString()
+                    },
+                    {
+                        locationName: '上海测试点',
+                        position: { lng: 121.473701, lat: 31.230416 },
+                        cohesion: 32.1,
+                        frictionAngle: 25.8,
+                        modulus: 950,
+                        source: '示例数据2',
+                        time: new Date().toLocaleString()
+                    }
+                ];
+                
+                exampleData.forEach(data => {
+                    collectedData.push(data);
+                    addMarker(data);
+                });
+                
+                updateDataStats();
+                console.log('系统初始化完成！');
+            }, 1000);
+        };
+        
+        // ===== 以下为原有显示函数（简化版）=====
+        function showParameter(paramName) {
+            clearMarkers();
+            
+            let color = '#ff6b6b';
+            if (paramName === 'frictionAngle') color = '#4ecdc4';
+            else if (paramName === 'modulus') color = '#45b7d1';
+            
+            collectedData.forEach(data => {
+                const value = data[paramName];
+                if (value > 0) {
+                    const content = `
+                        <div style="background: ${color}; color: white; padding: 8px; 
+                                    border-radius: 50%; width: 40px; height: 40px; 
+                                    text-align: center; line-height: 24px; font-weight: bold;">
+                            ${value}
+                        </div>
+                    `;
+                    
+                    const marker = new AMap.Marker({
+                        position: [data.position.lng, data.position.lat],
+                        content: content,
+                        offset: new AMap.Pixel(-20, -20)
+                    });
+                    
+                    marker.setMap(map);
+                    allMarkers.push(marker);
+                }
+            });
+        }
+        
+        function showAllData() {
+            clearMarkers();
+            collectedData.forEach(data => {
+                addMarker(data, true);
+            });
+        }
+        
+        function showHeatmap(paramName) {
+            if (heatmap) {
+                map.remove(heatmap);
+                heatmap = null;
+            }
+            
+            const heatmapData = collectedData
+                .filter(data => data[paramName] > 0)
+                .map(data => ({
+                    lng: data.position.lng,
+                    lat: data.position.lat,
+                    count: data[paramName]
+                }));
+            
+            if (heatmapData.length === 0) {
+                alert('请先收集一些数据！');
+                return;
+            }
+            
+            heatmap = new AMap.Heatmap(map, {
+                radius: 25,
+                opacity: [0, 0.8],
+                gradient: {
+                    0.4: 'blue',
+                    0.65: 'cyan',
+                    0.8: 'lime',
+                    0.95: 'yellow',
+                    1.0: 'red'
+                }
+            });
+            
+            heatmap.setDataSet({
+                data: heatmapData,
+                max: Math.max(...heatmapData.map(d => d.count))
+            });
+        }
+        
+        function clearDisplay() {
+            clearMarkers();
+            if (heatmap) {
+                map.remove(heatmap);
+                heatmap = null;
+            }
+            document.getElementById('data-panel').style.display = 'none';
+        }
+        
+        function clearMarkers() {
+            allMarkers.forEach(marker => marker.setMap(null));
+            allMarkers = [];
+        }
+    </script>
+</body>
+</html>
