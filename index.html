@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>邓肯-张参数收集系统（完整版）</title>
+    <title>邓肯-张参数收集系统（完整版·支持Excel导入）</title>
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; padding: 0; font-family: 'Microsoft YaHei', Arial; overflow: hidden; }
@@ -54,7 +54,7 @@
         .flex { display: flex; gap: 10px; }
         .flex button { flex: 1; }
     </style>
-    <!-- 引入高德地图API和SheetJS -->
+    <!-- 引入高德地图API和SheetJS（用于处理Excel） -->
     <script src="https://webapi.amap.com/maps?v=2.0&key=521cbc548a03bef89df50e3be3b666c1"></script>
     <script src="https://webapi.amap.com/maps?v=2.0&key=521cbc548a03bef89df50e3be3b666c1&plugin=AMap.Heatmap"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
@@ -106,9 +106,9 @@
             <h3>📂 批量导入数据</h3>
             <div class="file-zone" id="dropZone">
                 <div style="font-size: 40px;">📁</div>
-                <p><strong>拖拽CSV文件到此处</strong><br>或点击选择</p>
-                <input type="file" id="fileInput" accept=".csv,.txt" style="display:none;">
-                <p style="font-size:12px; color:#666;">支持格式：CSV（位置名称,经度,纬度,黏聚力,内摩擦角,弹性模量,文献来源）</p>
+                <p><strong>拖拽CSV或Excel文件到此处</strong><br>或点击选择</p>
+                <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
+                <p style="font-size:12px; color:#666;">支持格式：CSV / Excel（列顺序：位置名称,经度,纬度,黏聚力,内摩擦角,弹性模量,文献来源）</p>
             </div>
             <button class="btn btn-primary" id="downloadTemplateBtn">📥 下载CSV模板</button>
         </div>
@@ -342,7 +342,7 @@
             document.getElementById('manualForm').style.display = 'none';
         };
 
-        // ---------- 批量导入 ----------
+        // ---------- 批量导入（支持CSV和Excel）----------
         function parseCSV(text) {
             const lines = text.split('\n').filter(l => l.trim());
             if (lines.length < 2) return [];
@@ -367,20 +367,69 @@
         }
 
         function handleFile(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = parseCSV(e.target.result);
-                if (data.length) {
-                    collectedData.push(...data);
-                    saveToLocal();
-                    showAllMarkers();
-                    updateStatsAndTable();
-                    alert(`成功导入 ${data.length} 条数据！`);
-                } else {
-                    alert('未解析到有效数据，请检查CSV格式。');
-                }
-            };
-            reader.readAsText(file, 'UTF-8');
+            const fileName = file.name;
+            const extension = fileName.split('.').pop().toLowerCase();
+
+            if (extension === 'csv' || extension === 'txt') {
+                // 处理 CSV/TXT
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = parseCSV(e.target.result);
+                    if (data.length) {
+                        collectedData.push(...data);
+                        saveToLocal();
+                        showAllMarkers();
+                        updateStatsAndTable();
+                        alert(`成功导入 ${data.length} 条数据！`);
+                    } else {
+                        alert('未解析到有效数据，请检查CSV格式。');
+                    }
+                };
+                reader.readAsText(file, 'UTF-8');
+            } else if (extension === 'xlsx' || extension === 'xls') {
+                // 处理 Excel 文件
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                    if (rows.length < 2) {
+                        alert('Excel 文件没有数据行');
+                        return;
+                    }
+                    // 假设第一行是表头，从第二行开始解析
+                    const imported = [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (row.length < 6) continue; // 至少要有6列
+                        const item = {
+                            locationName: row[0] || '导入点',
+                            position: { lng: parseFloat(row[1]), lat: parseFloat(row[2]) },
+                            cohesion: parseFloat(row[3]) || 0,
+                            frictionAngle: parseFloat(row[4]) || 0,
+                            modulus: parseFloat(row[5]) || 0,
+                            source: row[6] || '批量导入',
+                            time: new Date().toLocaleString()
+                        };
+                        if (!isNaN(item.position.lng) && !isNaN(item.position.lat)) {
+                            imported.push(item);
+                        }
+                    }
+                    if (imported.length) {
+                        collectedData.push(...imported);
+                        saveToLocal();
+                        showAllMarkers();
+                        updateStatsAndTable();
+                        alert(`成功导入 ${imported.length} 条数据！`);
+                    } else {
+                        alert('未解析到有效数据，请检查 Excel 列顺序是否正确。');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('不支持的文件格式，请上传 CSV 或 Excel 文件。');
+            }
         }
 
         // 文件选择
@@ -465,8 +514,7 @@
         window.onload = function() {
             initMap();
             loadFromLocal();  // 恢复之前保存的数据
-            // 如果没有数据，地图空白，不添加任何示例
-            console.log('系统初始化完成');
+            console.log('系统初始化完成（支持Excel导入）');
         };
     </script>
 </body>
